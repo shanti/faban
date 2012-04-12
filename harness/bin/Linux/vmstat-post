@@ -27,7 +27,6 @@ BEGIN {
 
 # Normal dataset
 {
-    rows++;
     if (first == 1) {
         # Determine if row includes a timestamp
         n = split($1,time,":");
@@ -36,7 +35,9 @@ BEGIN {
             col1 = 1;
         }
         first = 0;
+        next; # ignore 1st row as data is garbage
     }
+    rows++;
     # If time exists, use it. Otherwise, use row# 
     if (col1 == 1)
         time[rows] = $1;

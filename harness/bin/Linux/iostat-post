@@ -1,7 +1,6 @@
 #!/bin/awk -f
 # Script to parse iostat output on linux
-# We assume that the default faban linux parameters are used to run
-# iostat i.e. iostat -
+# We assume that the default faban linux parameters are used to run iostat i.e. iostat -kdx
 # Output from iostat should look like (time col optional):
 #         Device:         rrqm/s   wrqm/s     r/s     w/s    rkB/s    wkB/s avgrq-sz avgqu-sz   await  svctm  %util
 # 02:04:02  sdb               0.14   278.92    0.96   85.28    17.16  1456.98    34.18     7.26   84.20   0.89   7.67
@@ -41,6 +40,8 @@ BEGIN {
 
 # Normal dataset - we use the first set to find out the disks
 {
+    if (NF == 0)  # skip blank lines
+        next;
 # We skip cpu data if that's what this is
     if (incpu == 1) {
         incpu = 0;
