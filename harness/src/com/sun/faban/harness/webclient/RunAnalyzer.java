@@ -186,29 +186,7 @@ public class RunAnalyzer {
             throw new IOException("Failed creating directory " +
                     analysisDir + '!');
         }
-        /**
-         ArrayList<String> cmd = new ArrayList<String>();
-         cmd.add(Config.BIN_DIR.trim() + "fenxi");
-         cmd.add(type.toString());
-         for (String runId : runIdStrings) {
-         String inputDir = Config.OUT_DIR + runId;
-         if (new File(inputDir, "xanaDB").isDirectory()) {
-         cmd.add(inputDir);
-         continue;
-         }
-         inputDir += File.separator + Config.POST_DIR;
-         if (new File(inputDir, "xanaDB").isDirectory()) {
-         cmd.add(inputDir);
-         continue;
-         }
-         // If we're here, no xanaDB is found.
-         throw new IOException("RunId " + runId +
-         " has not been post-processed and cannot be analyzed. " +
-         "Please run fenxi process on the run result first.");
-         }
 
-         cmd.add(Config.ANALYSIS_DIR + output);
-         **/
         // Before we put anything in, we deal with security.
         File metaDir = new File(analysisDir, "META-INF");
         metaDir.mkdir();
@@ -235,13 +213,12 @@ public class RunAnalyzer {
     * @throws IOException if runDir or certain files in it can't be accessed or
     *            file format is incorrect
     */
-
     public void compare(String runDirs[], String outDir) throws IOException {
         String outFile = outDir + File.separator + "compare.xan";
         TextTable infoTable, thruTable, opAvgThruTable = null, opThruTable;
         TextTable respTable, percentRespTable[] = null, avgRespTable = null, cpuTable = null;
         String thruMetric = null, respMetric = null;
-        PrintWriter p = null;
+        PrintWriter p;
         ArrayList<String> rtAvgList;
         ArrayList<String> rtPercentNames = null;
         ArrayList<String> opNames = new ArrayList<String>();
@@ -249,10 +226,11 @@ public class RunAnalyzer {
         ArrayList<Double> thruList[] = new ArrayList[runDirs.length];
         ArrayList<Double> opThruList[][] = null;
         ArrayList<Double> timeVals = new ArrayList<Double>();
+        ArrayList<Double> timeDistVals = new ArrayList<Double>();
         List<String> cpuList[];
-        int maxThruRows = 0;
+        int maxThruRows = 0, maxDistRows = 0;
         ArrayList<Double> respList[][] = null;
-
+        ArrayList<Integer> respDistList[][] = null;
         infoTable = new TextTable(runDirs.length, 4);
         infoTable.setHeader(0, "RunID");
         infoTable.setHeader(1, "Avg. Throughput");
@@ -279,6 +257,12 @@ public class RunAnalyzer {
                 maxThruRows = thruList[i].size();
                 timeVals = thisTimeVals;
             }
+            ArrayList<Double> thisDistTimeVals = detail.getTimesDist();
+            if (thisDistTimeVals.size() > maxDistRows) {
+                maxDistRows = thisDistTimeVals.size();
+                timeDistVals = thisDistTimeVals;
+            }
+
             // read the metric from the first file
             if (i == 0) {
                 respMetric = getRespUnit(reader);
@@ -299,6 +283,7 @@ public class RunAnalyzer {
 
             if (i == 0) {
                 respList = new ArrayList[runDirs.length][opNames.size()];
+                respDistList = new ArrayList[runDirs.length][opNames.size()];
 
                 // thru. table on a per operation basis
                 opAvgThruTable = new TextTable(runDirs.length, opNames.size() + 1);
@@ -347,6 +332,7 @@ public class RunAnalyzer {
                 opAvgThruTable.setField(i, j + 1, String.format("%4.3f", detail.getOpAvgThruput(j)));
                 opThruList[i][j] = detail.getOpThruput(j);
                 respList[i][j] = detail.getOpRT(j);
+                respDistList[i][j] = detail.getOpRTDist(j);
                 avgRespTable.setField(i, j + 1, rtAvgList.get(j));
                 for (int k = 0; k < rtPercentNames.size(); k++) {
                     percentRespTable[k].setField(i, 0, runDirs[i]);
@@ -449,6 +435,33 @@ public class RunAnalyzer {
             p.println(respTable.toString());
         }
 
+        // Print distribution of response times
+        for (int k = 0; k < opNames.size(); k++) {
+            p.println("Section: Distribution of Response Times for Operation '" +
+                    opNames.get(k) + "' (" + respMetric + ")");
+            p.println("Display: Line");
+            respTable = new TextTable(maxDistRows, runDirs.length + 1);
+            respTable.setHeader(0, "Time");
+
+            // Set time column for all rows
+            for (int i = 0; i < timeDistVals.size(); i++)
+                respTable.setField(i, 0, timeDistVals.get(i).toString());
+
+            for (int i = 0; i < runDirs.length; i++) {
+                respTable.setHeader(i + 1, runDirs[i]);
+                int j;
+                for (j = 0; j < respDistList[i][k].size(); j++) {
+                    respTable.setField(j, i + 1, respDistList[i][k].get(j).toString());
+                }
+                int rem = timeDistVals.size() - respDistList[i][k].size();
+                for (; rem > 0; rem--) {
+                    respTable.setField(j++, i + 1, "-");
+                }
+            }
+            p.println(respTable.toString());
+        }
+
+        // Print CPU utilization
         p.println("Section: Average CPU Utilization");
         p.println(cpuTable.toString());
 
